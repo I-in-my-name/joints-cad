@@ -1,0 +1,6 @@
+[package]
+name = "joints-cad"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
