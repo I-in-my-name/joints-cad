@@ -17,11 +17,21 @@ pub struct Point{
    point: na::Vector4<f64>,
 }
 impl Point{
+
+    fn point_ignore_d(&mut self) -> na::Vector3<f64>{
+        na::Vector3::new(
+            self.point.x,
+            self.point.y,
+            self.point.w,
+        )
+    }
+
     fn vector_to_point(vector: na::Vector4<f64>) -> Point{
         Point{
             point: vector,
         }
     }
+
     pub fn new(x: f64, y:f64, z:f64, d:f64) -> Self{
         Point{
             point: na::Vector4::new(
@@ -32,6 +42,7 @@ impl Point{
             )
         }
     }
+
     pub fn float_cmp(one: &Self, other: &Self) -> Ordering{
         let this_value: f64 = (one.point.x.powf(2.0) + one.point.y.powf(2.0) + one.point.z.powf(2.)).sqrt();
         let other_value: f64 = (other.point.x.powf(2.0) + other.point.y.powf(2.0) + other.point.z.powf(2.0)).sqrt();
@@ -104,15 +115,71 @@ impl PerspectiveObject{
         Point::new(average_x, average_y, average_z, 1.0)
     }
 }
+impl Rotatable for PerspectiveObject{
+    fn rotate(&mut self, to_rotate_by: na::Matrix3<f64>){
+     self.orientation = self.orientation * to_rotate_by;
+    }
+}
+impl Translatable for PerspectiveObject{
+    fn translate(&mut self, to_translate_by: na::Vector4<f64>){
+        self.centre = self.centre + Point::vector_to_point(to_translate_by);
+    }
+}
 
 pub struct Camera {
     orientation: na::Matrix3<f64>,
     centre: Point,
-    camera_matrix_superior:  na::Matrix4<f64>,
+    calibration_matrix: na::Matrix3<f64>,
+    camera_extrinsics: na::Matrix3x4<f64>,
+    camera_matrix_superior:  na::Matrix3x4<f64>,
 }
+impl Camera{
+    //The coupling here is logically necessary
+    fn update_extrinsics(&mut self, new_centre: Point, new_orientation: na::Matrix3<f64>){
+        self.centre = new_centre;
+        self.orientation = new_orientation;
+        //correct way of splicing together two distinct matrices
+
+        self.camera_extrinsics = na::Matrix3x4::new(
+            self.orientation.m11, self.orientation.m12, self.orientation.m13, self.centre.point.x, 
+
+            self.orientation.m21, self.orientation.m22, self.orientation.m23, self.centre.point.y,
+
+            self.orientation.m31, self.orientation.m32, self.orientation.m33, self.centre.point.z,  
+
+            ); 
+    }
+
+    fn update_extrinsics_centre(&mut self, new_centre: Point){
+        self.update_extrinsics(new_centre, self.orientation);
+    }
+
+    fn update_extrinsics_orientation(&mut self, new_orientation: na::Matrix3<f64>){
+         self.update_extrinsics(self.centre, new_orientation);
+    }
+    //Very much subject to change, this is tracer code and needs to be fine tuned
+    fn update_intrinsics(&mut self){
+        self.calibration_matrix = na::Matrix3::new(
+                1.0, 0.0, self.centre.point.x,
+                0.0, 1.0, self.centre.point.y,
+                0.0, 0.0, 1.0,
+            );
+    }
+    //if 3x4 is fine then refactor necessary, check after tracer code is working 
+    fn update_superior_matrix(&mut self){
+        self.camera_matrix_superior = self.calibration_matrix * self.camera_extrinsics;
+    }
+}
+//These are definitely subject to change as they will need to update the callibration matrix and/or
+//the camera extrinsics 
 impl Translatable for Camera{
     fn translate(&mut self, to_translate_by: na::Vector4<f64>){
         self.centre = self.centre + Point::vector_to_point(to_translate_by);
+    }
+}
+impl Rotatable for Camera{
+    fn rotate(&mut self, to_rotate_by: na::Matrix3<f64>){
+     self.orientation = self.orientation * to_rotate_by;
     }
 }
 
