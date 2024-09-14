@@ -10,6 +10,13 @@ fn main() {
     libs::pixels_lib::game();
 }
 
-struct worldSpace {
-    
+struct WorldSpace {
+    all_independents: Vec<libs::core::coordinate_objects>
+}
+impl WorldSpace{
+    fn new() -> Self{
+        WorldSpace{
+            all_independents: vec![libs::core::coordinate_objects::Point_object(libs::core::Point::new(1.0,2.0,3.0,1.0))],
+        }
+    }
 }

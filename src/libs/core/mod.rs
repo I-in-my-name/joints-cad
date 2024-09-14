@@ -2,6 +2,13 @@ extern crate nalgebra as na;
 use std::cmp::Ordering;
 use std::ops::Add;
 
+pub enum coordinate_objects{
+    Camera_object(Camera),
+    Point_object(Point),
+    Perspective_object(PerspectiveObject),
+
+}
+
 trait Translatable {
     fn translate(&mut self, to_translate_by: na::Vector4<f64>);
 }
@@ -129,24 +136,47 @@ impl Translatable for PerspectiveObject{
 pub struct Camera {
     orientation: na::Matrix3<f64>,
     centre: Point,
-    calibration_matrix: na::Matrix3<f64>,
-    camera_extrinsics: na::Matrix3x4<f64>,
-    camera_matrix_superior:  na::Matrix3x4<f64>,
+    calibration_matrix: na::Matrix4<f64>,
+    camera_extrinsics: na::Matrix4<f64>,
+    camera_matrix_superior:  na::Matrix4<f64>,
+    fov_y: f64,
+    fov_x: f64,
+    min_depth_difference: f64,
+    max_depth_difference: f64,
 }
 impl Camera{
+    fn new() -> Self{
+        let mut new_camera = Camera {
+            orientation: na::Matrix3::<f64>::zeros(),
+            centre: Point::new(0.0,0.0,0.0,0.0),
+            calibration_matrix: na::Matrix4::<f64>::zeros(),
+            camera_extrinsics: na::Matrix4::<f64>::zeros(),
+            camera_matrix_superior: na::Matrix4::<f64>::zeros(),
+            fov_y: 90.0,
+            fov_x: 90.0,
+            min_depth_difference: 5.0,
+            max_depth_difference: 120.0,
+        };
+        new_camera.update_extrinsics_centre(Point::new(0.0,0.0,1.0,1.0));
+        new_camera.update_intrinsics();
+        new_camera.update_superior_matrix();
+        new_camera
+
+    }
     //The coupling here is logically necessary
     fn update_extrinsics(&mut self, new_centre: Point, new_orientation: na::Matrix3<f64>){
         self.centre = new_centre;
         self.orientation = new_orientation;
         //correct way of splicing together two distinct matrices
 
-        self.camera_extrinsics = na::Matrix3x4::new(
+        self.camera_extrinsics = na::Matrix4::new(
             self.orientation.m11, self.orientation.m12, self.orientation.m13, self.centre.point.x, 
 
             self.orientation.m21, self.orientation.m22, self.orientation.m23, self.centre.point.y,
 
-            self.orientation.m31, self.orientation.m32, self.orientation.m33, self.centre.point.z,  
+            self.orientation.m31, self.orientation.m32, self.orientation.m33, self.centre.point.z,
 
+            0.0,                  0.0,                  0.0,                  1.0,
             ); 
     }
 
@@ -159,10 +189,11 @@ impl Camera{
     }
     //Very much subject to change, this is tracer code and needs to be fine tuned
     fn update_intrinsics(&mut self){
-        self.calibration_matrix = na::Matrix3::new(
-                1.0, 0.0, self.centre.point.x,
-                0.0, 1.0, self.centre.point.y,
-                0.0, 0.0, 1.0,
+        self.calibration_matrix = na::Matrix4::new(
+                1.0, 0.0, self.centre.point.x, 0.0,
+                0.0, 1.0, self.centre.point.y, 0.0,
+                0.0, 0.0, 1.0,                 0.0,
+                0.0, 0.0, 0.0,                 1.0
             );
     }
     //if 3x4 is fine then refactor necessary, check after tracer code is working 
