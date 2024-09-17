@@ -2,11 +2,22 @@ extern crate nalgebra as na;
 use std::cmp::Ordering;
 use std::ops::Add;
 
-pub enum coordinate_objects{
+pub enum coordinate_object{
     Camera_object(Camera),
     Point_object(Point),
     Perspective_object(PerspectiveObject),
+    Line_object(Line),
 
+}
+impl Point_Construct for coordinate_object{
+    fn getPoints(&mut self) -> Vec<Point>{
+        match self{
+            Self::Camera_object(camera) => camera.getPoints(),
+            Self::Point_object(point) => point.getPoints(),
+            Self::Perspective_object(perspective_object) => perspective_object.getPoints(),
+            Self::Line_object(line) => line.getPoints(),
+        }
+    }
 }
 
 trait Translatable {
@@ -17,9 +28,12 @@ trait Translatable {
 trait Rotatable {
     fn rotate(&mut self, to_rotate_by: na::Matrix3<f64>);
 }
+trait Point_Construct{
+    fn getPoints(&mut self) -> Vec<Point>;
+}
 
 
-#[derive(Clone,Copy,PartialEq,PartialOrd)]
+#[derive(Clone,Copy,Debug,PartialEq,PartialOrd)]
 pub struct Point{
    point: na::Vector4<f64>,
 }
@@ -74,8 +88,33 @@ impl Add for Point{
             point: self.point + other.point,
         }
     }
-
 }
+
+impl Point_Construct for Point{
+    fn getPoints(&mut self) -> Vec<Point>{
+        vec![*self]
+    }
+}
+pub struct Line{
+    point_a: Point,
+    point_b: Point,
+}
+impl Line{
+    pub fn new(point_one: Point, point_two: Point) -> Self{
+        Line{
+            point_a: point_one,
+            point_b: point_two,
+        }
+    }
+}
+impl Point_Construct for Line{
+    fn getPoints(&mut self) -> Vec<Point>{
+        vec![self.point_a,self.point_b]
+    }
+}
+
+
+
 #[derive(Clone)]
 pub struct Surface{
     //Must change here for curved surfaces along with rendering logic, potentially an enum to
@@ -132,7 +171,17 @@ impl Translatable for PerspectiveObject{
         self.centre = self.centre + Point::vector_to_point(to_translate_by);
     }
 }
+impl Point_Construct for PerspectiveObject{
+    fn getPoints(&mut self) -> Vec<Point>{
+        let mut points_vec: Vec<Point> = sides_to_points(&self.sides);
+        let mut sorted_vec = Point::sort_point_vector(points_vec);
+        sorted_vec.dedup();
 
+        sorted_vec
+    }
+}
+
+#[derive(Debug)]
 pub struct Camera {
     orientation: na::Matrix3<f64>,
     centre: Point,
@@ -211,6 +260,11 @@ impl Translatable for Camera{
 impl Rotatable for Camera{
     fn rotate(&mut self, to_rotate_by: na::Matrix3<f64>){
      self.orientation = self.orientation * to_rotate_by;
+    }
+}
+impl Point_Construct for Camera{
+    fn getPoints(&mut self) -> Vec<Point>{
+        vec![self.centre]
     }
 }
 
