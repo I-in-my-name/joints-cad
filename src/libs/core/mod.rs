@@ -2,6 +2,7 @@ extern crate nalgebra as na;
 use std::cmp::Ordering;
 use std::ops::Add;
 
+#[derive(Clone,Debug)]
 pub enum coordinate_object{
     Camera_object(Camera),
     Point_object(Point),
@@ -10,26 +11,26 @@ pub enum coordinate_object{
 
 }
 impl Point_Construct for coordinate_object{
-    fn getPoints(&mut self) -> Vec<Point>{
+    fn get_points(&self) -> Vec<Point>{
         match self{
-            Self::Camera_object(camera) => camera.getPoints(),
-            Self::Point_object(point) => point.getPoints(),
-            Self::Perspective_object(perspective_object) => perspective_object.getPoints(),
-            Self::Line_object(line) => line.getPoints(),
+            Self::Camera_object(camera) => camera.get_points(),
+            Self::Point_object(point) => point.get_points(),
+            Self::Perspective_object(perspective_object) => perspective_object.get_points(),
+            Self::Line_object(line) => line.get_points(),
         }
     }
 }
 
-trait Translatable {
+pub trait Translatable {
     fn translate(&mut self, to_translate_by: na::Vector4<f64>);
 }
 //Rotate here means around the object centre and has to do with orientation and NOT position (not
 //rotating around )
-trait Rotatable {
+pub trait Rotatable {
     fn rotate(&mut self, to_rotate_by: na::Matrix3<f64>);
 }
-trait Point_Construct{
-    fn getPoints(&mut self) -> Vec<Point>;
+pub trait Point_Construct{
+    fn get_points(&self) -> Vec<Point>;
 }
 
 
@@ -39,11 +40,12 @@ pub struct Point{
 }
 impl Point{
 
+    //Note!! not equalised!!!
     fn point_ignore_d(&mut self) -> na::Vector3<f64>{
         na::Vector3::new(
             self.point.x,
             self.point.y,
-            self.point.w,
+            self.point.z,
         )
     }
 
@@ -53,6 +55,15 @@ impl Point{
         }
     }
 
+    fn point_to_vector(&self) -> na::Vector4<f64>{
+         na::Vector4::new(
+                self.point.x,
+                self.point.y,
+                self.point.z,
+                self.point.w,
+            )
+    }
+
     pub fn new(x: f64, y:f64, z:f64, d:f64) -> Self{
         Point{
             point: na::Vector4::new(
@@ -60,8 +71,10 @@ impl Point{
                 y,
                 z,
                 d,
-            )
-        }
+            )}
+    }
+    pub fn get_depth(&self) -> f64{
+        self.point.w
     }
 
     pub fn float_cmp(one: &Self, other: &Self) -> Ordering{
@@ -91,10 +104,13 @@ impl Add for Point{
 }
 
 impl Point_Construct for Point{
-    fn getPoints(&mut self) -> Vec<Point>{
+    fn get_points(&self) -> Vec<Point>{
         vec![*self]
     }
+
 }
+
+#[derive(Clone,Copy,Debug)]
 pub struct Line{
     point_a: Point,
     point_b: Point,
@@ -108,14 +124,14 @@ impl Line{
     }
 }
 impl Point_Construct for Line{
-    fn getPoints(&mut self) -> Vec<Point>{
+    fn get_points(&self) -> Vec<Point>{
         vec![self.point_a,self.point_b]
     }
 }
 
 
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct Surface{
     //Must change here for curved surfaces along with rendering logic, potentially an enum to
     //describe the type of curve rendering along with a function.
@@ -123,6 +139,8 @@ pub struct Surface{
     //Not Just an alias for future editing
     key_points: Vec<Point>,
 }
+
+#[derive(Clone,Debug)]
 pub struct PerspectiveObject{
     //An object is considered to have an orientation and is made up of sides as well as having a
     //centre point.
@@ -172,7 +190,7 @@ impl Translatable for PerspectiveObject{
     }
 }
 impl Point_Construct for PerspectiveObject{
-    fn getPoints(&mut self) -> Vec<Point>{
+    fn get_points(&self) -> Vec<Point>{
         let mut points_vec: Vec<Point> = sides_to_points(&self.sides);
         let mut sorted_vec = Point::sort_point_vector(points_vec);
         sorted_vec.dedup();
@@ -181,12 +199,13 @@ impl Point_Construct for PerspectiveObject{
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone,Debug)]
 pub struct Camera {
     orientation: na::Matrix3<f64>,
     centre: Point,
     calibration_matrix: na::Matrix4<f64>,
     camera_extrinsics: na::Matrix4<f64>,
+    extrinsics_inverse: na::Matrix4<f64>,
     camera_matrix_superior:  na::Matrix4<f64>,
     fov_y: f64,
     fov_x: f64,
@@ -200,6 +219,7 @@ impl Camera{
             centre: Point::new(0.0,0.0,0.0,0.0),
             calibration_matrix: na::Matrix4::<f64>::zeros(),
             camera_extrinsics: na::Matrix4::<f64>::zeros(),
+            extrinsics_inverse: na::Matrix4::<f64>::zeros(),
             camera_matrix_superior: na::Matrix4::<f64>::zeros(),
             fov_y: 90.0,
             fov_x: 90.0,
@@ -213,7 +233,7 @@ impl Camera{
 
     }
     //The coupling here is logically necessary
-    fn update_extrinsics(&mut self, new_centre: Point, new_orientation: na::Matrix3<f64>){
+    pub fn update_extrinsics(&mut self, new_centre: Point, new_orientation: na::Matrix3<f64>){
         self.centre = new_centre;
         self.orientation = new_orientation;
         //correct way of splicing together two distinct matrices
@@ -227,17 +247,26 @@ impl Camera{
 
             0.0,                  0.0,                  0.0,                  1.0,
             ); 
+        match self.camera_extrinsics.try_inverse(){
+            Some(inverse) => self.extrinsics_inverse = inverse,
+            None => self.extrinsics_inverse = na::Matrix4::new( 
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0,
+                ), 
+        };
     }
 
-    fn update_extrinsics_centre(&mut self, new_centre: Point){
+    pub fn update_extrinsics_centre(&mut self, new_centre: Point){
         self.update_extrinsics(new_centre, self.orientation);
     }
 
-    fn update_extrinsics_orientation(&mut self, new_orientation: na::Matrix3<f64>){
+    pub fn update_extrinsics_orientation(&mut self, new_orientation: na::Matrix3<f64>){
          self.update_extrinsics(self.centre, new_orientation);
     }
     //Very much subject to change, this is tracer code and needs to be fine tuned
-    fn update_intrinsics(&mut self){
+    pub fn update_intrinsics(&mut self){
         self.calibration_matrix = na::Matrix4::new(
                 1.0, 0.0, self.centre.point.x, 0.0,
                 0.0, 1.0, self.centre.point.y, 0.0,
@@ -246,8 +275,29 @@ impl Camera{
             );
     }
     //if 3x4 is fine then refactor necessary, check after tracer code is working 
-    fn update_superior_matrix(&mut self){
+    pub fn update_superior_matrix(&mut self){
         self.camera_matrix_superior = self.calibration_matrix * self.camera_extrinsics;
+    }
+    pub fn to_local_coords(&self, point: Point) -> Point{
+        Point::vector_to_point(self.extrinsics_inverse * point.point_to_vector()) 
+    }
+    pub fn return_visible_objects(self, objects: Vec<coordinate_object>) -> Vec<coordinate_object>{
+        //predeclare before for loop
+        let mut visible_objects: Vec<coordinate_object> = vec![];
+        let mut local_point: Point;
+        let mut depth_difference: f64;
+        for object in objects.iter(){
+            for point in object.get_points().iter(){
+                local_point = self.to_local_coords(point.clone());
+                depth_difference = local_point.get_depth() - self.centre.get_depth();
+                //logic here needs to be refined for a better clipping volume
+                if depth_difference > self.min_depth_difference && depth_difference < self.max_depth_difference{
+                    visible_objects.push(object.clone());
+                    break;
+                }
+            }
+        }
+        visible_objects
     }
 }
 //These are definitely subject to change as they will need to update the callibration matrix and/or
@@ -263,11 +313,10 @@ impl Rotatable for Camera{
     }
 }
 impl Point_Construct for Camera{
-    fn getPoints(&mut self) -> Vec<Point>{
+    fn get_points(&self) -> Vec<Point>{
         vec![self.centre]
     }
 }
-
 
 //A quirk of rust being that there is no way to abstract over mutability, these two functions can
 //be considered as having entirely different contexts and are thus coupled differently. You could

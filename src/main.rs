@@ -27,14 +27,12 @@ impl WorldSpace{
             ],
         }
     }
-    fn register_object()
-    fn camera_visible_objects(camera: Camera) -> Vec<coordinate_object>{
-        for object in all_independents.iter(){
-            for point in object.getPoints().iter(){
-                print!(Point{0.0,0.0,0.0,1.0});
-                print!(camera);
-            }
-        }
+    fn register_object(){}
 
+    //With the cameras Extrinsics matrix, we can use the inverse to effectively translate to a new
+    //coordinate system around the camera, allowing for easier and clearer logic.
+    fn get_visible_objects(&self, camera: Camera) -> Vec<coordinate_object>{
+        camera.return_visible_objects(self.all_independents.clone())
     }
 }
+
