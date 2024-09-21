@@ -213,7 +213,7 @@ pub struct Camera {
     max_depth_difference: f64,
 }
 impl Camera{
-    fn new() -> Self{
+    pub fn new() -> Self{
         let mut new_camera = Camera {
             orientation: na::Matrix3::<f64>::zeros(),
             centre: Point::new(0.0,0.0,0.0,0.0),
@@ -281,7 +281,7 @@ impl Camera{
     pub fn to_local_coords(&self, point: Point) -> Point{
         Point::vector_to_point(self.extrinsics_inverse * point.point_to_vector()) 
     }
-    pub fn return_visible_objects(self, objects: Vec<coordinate_object>) -> Vec<coordinate_object>{
+    pub fn return_visible_objects(&self, objects: Vec<coordinate_object>) -> Vec<coordinate_object>{
         //predeclare before for loop
         let mut visible_objects: Vec<coordinate_object> = vec![];
         let mut local_point: Point;
