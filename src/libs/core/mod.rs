@@ -41,7 +41,7 @@ pub struct Point{
 impl Point{
 
     //Note!! not equalised!!!
-    fn point_ignore_d(&mut self) -> na::Vector3<f64>{
+    fn point_ignore_w(&mut self) -> na::Vector3<f64>{
         na::Vector3::new(
             self.point.x,
             self.point.y,
@@ -64,17 +64,17 @@ impl Point{
             )
     }
 
-    pub fn new(x: f64, y:f64, z:f64, d:f64) -> Self{
+    pub fn new(x: f64, y:f64, z:f64, w:f64) -> Self{
         Point{
             point: na::Vector4::new(
                 x,
                 y,
                 z,
-                d,
+                w,
             )}
     }
     pub fn get_depth(&self) -> f64{
-        self.point.w
+        self.point.z
     }
 
     pub fn float_cmp(one: &Self, other: &Self) -> Ordering{
@@ -209,13 +209,15 @@ pub struct Camera {
     camera_matrix_superior:  na::Matrix4<f64>,
     fov_y: f64,
     fov_x: f64,
+    screen_x: u8,
+    screen_y: u8,
     min_depth_difference: f64,
     max_depth_difference: f64,
 }
 impl Camera{
     pub fn new() -> Self{
         let mut new_camera = Camera {
-            orientation: na::Matrix3::<f64>::zeros(),
+            orientation: na::Matrix3::<f64>::identity(),
             centre: Point::new(0.0,0.0,0.0,0.0),
             calibration_matrix: na::Matrix4::<f64>::zeros(),
             camera_extrinsics: na::Matrix4::<f64>::zeros(),
@@ -223,6 +225,8 @@ impl Camera{
             camera_matrix_superior: na::Matrix4::<f64>::zeros(),
             fov_y: 90.0,
             fov_x: 90.0,
+            screen_x: 128,
+            screen_y:128,
             min_depth_difference: 5.0,
             max_depth_difference: 120.0,
         };
@@ -246,16 +250,19 @@ impl Camera{
             self.orientation.m31, self.orientation.m32, self.orientation.m33, self.centre.point.z,
 
             0.0,                  0.0,                  0.0,                  1.0,
-            ); 
-        match self.camera_extrinsics.try_inverse(){
-            Some(inverse) => self.extrinsics_inverse = inverse,
-            None => self.extrinsics_inverse = na::Matrix4::new( 
+            );
+        self.extrinsics_inverse = self.camera_extrinsics.clone();
+        match self.extrinsics_inverse.try_inverse_mut(){
+            true => (), 
+            _ => self.extrinsics_inverse = 
+                na::Matrix4::new( 
                 1.0, 0.0, 0.0, 0.0,
                 0.0, 1.0, 0.0, 0.0,
                 0.0, 0.0, 1.0, 0.0,
                 0.0, 0.0, 0.0, 1.0,
                 ), 
         };
+        
     }
 
     pub fn update_extrinsics_centre(&mut self, new_centre: Point){
@@ -281,7 +288,7 @@ impl Camera{
     pub fn to_local_coords(&self, point: Point) -> Point{
         Point::vector_to_point(self.extrinsics_inverse * point.point_to_vector()) 
     }
-    pub fn return_visible_objects(&self, objects: Vec<coordinate_object>) -> Vec<coordinate_object>{
+    pub fn return_visible_objects(&self, objects: &Vec<coordinate_object>) -> Vec<coordinate_object>{
         //predeclare before for loop
         let mut visible_objects: Vec<coordinate_object> = vec![];
         let mut local_point: Point;
@@ -289,15 +296,36 @@ impl Camera{
         for object in objects.iter(){
             for point in object.get_points().iter(){
                 local_point = self.to_local_coords(point.clone());
-                depth_difference = local_point.get_depth() - self.centre.get_depth();
+                depth_difference = (self.orientation * local_point.point_ignore_w()).z;
                 //logic here needs to be refined for a better clipping volume
-                if depth_difference > self.min_depth_difference && depth_difference < self.max_depth_difference{
+                //because of the way we represent lines, we need to be able to register a line in
+                //front of us with a point really far away, this is why the max_depth_difference is
+                //used to render objects and not here (it would invalidate lines longer than the
+                //max difference)
+                print!("point: {:?}\n local_point: {:?}", point, local_point);
+                print!("point depth difference {:?}\n", depth_difference);
+                if depth_difference >= self.min_depth_difference{
                     visible_objects.push(object.clone());
                     break;
                 }
             }
         }
         visible_objects
+    }
+    pub fn get_screen_values(&self, objects: &Vec<coordinate_object>) -> Vec<u8>{
+        let mut return_values: Vec<u8> = vec![0; (self.screen_x * self.screen_y) as usize];
+        let mut visible_objects: Vec<coordinate_object> = self.return_visible_objects(objects);
+        let mut temp_vec: na::Vector4<f64>;
+
+        for vis_obj in visible_objects.iter(){
+            match vis_obj{
+                coordinate_object::Point_object(point) => {temp_vec = self.camera_matrix_superior * Point::point_to_vector(&point);
+                print!("TP : {:?}\n", temp_vec);
+                    },
+                _ => (),
+            }
+        }
+        return_values
     }
 }
 //These are definitely subject to change as they will need to update the callibration matrix and/or
