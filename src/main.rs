@@ -24,21 +24,24 @@ use tao::window::{WindowBuilder};
 fn main() -> Result<(), Error> {
     let mut worldspace = WorldSpace::new();
     let mut camera = Camera::new();
-    camera.update_extrinsics_centre(Point::new(10.0,0.0,0.0,1.0));
+    camera.update_extrinsics_centre(Point::new(10.0,10.0,0.0,1.0));
     camera.rotate(na::Matrix3::new(1.0, 0.0, 0.0,
-            0.0, 0.0, -1.0,
-            0.0, 1.0, 0.0));
+            0.0, 0.7071070, -0.707107,
+            0.0, 0.7071070, 0.7071070));
+    camera.rotate(na::Matrix3::new( 0.707107,0.0, 0.707107,
+            0.0, 1.0, 0.0,
+            -0.707107, 0.0, 0.707107));
     worldspace.register_object(coordinate_object::Camera_object(camera));
-    //worldspace.register_object(coordinate_object::Point_object(Point::new(0.0,10.0,0.0,1.0)));
-    worldspace.register_object(coordinate_object::Point_object(Point::new(0.0,20.0,0.0,1.0)));
+    worldspace.register_object(coordinate_object::Point_object(Point::new(21.0,21.0,1.0,1.0)));
+    worldspace.register_object(coordinate_object::Point_object(Point::new(-40.0,60.0,50.0,1.0)));
     let mut visible_objects: Vec<coordinate_object>;
     for camera in worldspace.cameras.iter(){
         visible_objects = worldspace.get_visible_objects(camera);
-    print!("below \\/");
+   //   print!("below \\/");
         print!("{:?}",visible_objects);
     }
 
-    print!("Above /\\");
+    //print!("Above /\\");
     let pixels = PixelsStruct::new()?;
     //pixels.game()
     Ok(())

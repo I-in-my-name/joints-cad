@@ -292,18 +292,20 @@ impl Camera{
         //predeclare before for loop
         let mut visible_objects: Vec<coordinate_object> = vec![];
         let mut local_point: Point;
+        let unit_vector = (self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w()).transpose(); 
         let mut depth_difference: f64;
         for object in objects.iter(){
             for point in object.get_points().iter(){
                 local_point = self.to_local_coords(point.clone());
-                depth_difference = (self.orientation * local_point.point_ignore_w()).z;
+                //create a unit vector in the original depth direction Z axis
+                depth_difference = (unit_vector * local_point.point_ignore_w()).to_scalar();
                 //logic here needs to be refined for a better clipping volume
                 //because of the way we represent lines, we need to be able to register a line in
                 //front of us with a point really far away, this is why the max_depth_difference is
                 //used to render objects and not here (it would invalidate lines longer than the
                 //max difference)
-                print!("point: {:?}\n local_point: {:?}", point, local_point);
-                print!("point depth difference {:?}\n", depth_difference);
+                print!("point: {:?}\n local_point: {:?}\n depth: {:?}\n", point, local_point,depth_difference);
+
                 if depth_difference >= self.min_depth_difference{
                     visible_objects.push(object.clone());
                     break;
