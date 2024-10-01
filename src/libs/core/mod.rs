@@ -227,7 +227,7 @@ impl Camera{
             fov_x: 90.0,
             screen_x: 128,
             screen_y:128,
-            min_depth_difference: 5.0,
+            min_depth_difference: 2.0,
             max_depth_difference: 120.0,
         };
         new_camera.update_extrinsics_centre(Point::new(0.0,0.0,1.0,1.0));
@@ -292,19 +292,30 @@ impl Camera{
         //predeclare before for loop
         let mut visible_objects: Vec<coordinate_object> = vec![];
         let mut local_point: Point;
-        let unit_vector = (self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w()).transpose(); 
         let mut depth_difference: f64;
         for object in objects.iter(){
             for point in object.get_points().iter(){
-                local_point = self.to_local_coords(point.clone());
-                //create a unit vector in the original depth direction Z axis
-                depth_difference = (unit_vector * local_point.point_ignore_w()).to_scalar();
-                //logic here needs to be refined for a better clipping volume
                 //because of the way we represent lines, we need to be able to register a line in
                 //front of us with a point really far away, this is why the max_depth_difference is
                 //used to render objects and not here (it would invalidate lines longer than the
                 //max difference)
-                print!("point: {:?}\n local_point: {:?}\n depth: {:?}\n", point, local_point,depth_difference);
+                
+                //creating new unit vectors for the local coordinates of the camera that are facing
+                //the way the camera faces
+                let unit_vector_x = self.orientation * Point::new(1.0,0.0,0.0,1.0).point_ignore_w(); 
+                let unit_vector_y = self.orientation * Point::new(0.0,1.0,0.0,1.0).point_ignore_w(); 
+                let unit_vector_z = self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w(); 
+                
+                //manually making a matrix where each column is one of the unit vectors.
+                let basis_change_matrix = na::Matrix3::new(
+                    unit_vector_x.x, unit_vector_y.x, unit_vector_z.x, 
+                    unit_vector_x.y, unit_vector_y.y, unit_vector_z.y,
+                    unit_vector_x.z, unit_vector_y.z, unit_vector_z.z 
+                );
+                //apply change of basis to get truly camera oriented coords
+                local_point = (basis_change_matrix * point.clone().point_ignore_w());
+                depth_difference = local_point.z;
+
 
                 if depth_difference >= self.min_depth_difference{
                     visible_objects.push(object.clone());
