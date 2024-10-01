@@ -49,13 +49,13 @@ impl Point{
         )
     }
 
-    fn vector_to_point(vector: na::Vector4<f64>) -> Point{
+    pub fn vector_to_point(vector: na::Vector4<f64>) -> Point{
         Point{
             point: vector,
         }
     }
 
-    fn point_to_vector(&self) -> na::Vector4<f64>{
+    pub fn point_to_vector(&self) -> na::Vector4<f64>{
          na::Vector4::new(
                 self.point.x,
                 self.point.y,
@@ -121,6 +121,12 @@ impl Line{
             point_a: point_one,
             point_b: point_two,
         }
+    }
+    pub fn get_start(&self) -> Point{
+        self.point_a
+    }
+    pub fn get_end(&self) -> Point{
+        self.point_b
     }
 }
 impl Point_Construct for Line{
@@ -291,7 +297,7 @@ impl Camera{
     pub fn return_visible_objects(&self, objects: &Vec<coordinate_object>) -> Vec<coordinate_object>{
         //predeclare before for loop
         let mut visible_objects: Vec<coordinate_object> = vec![];
-        let mut local_point: Point;
+        let mut local_point: na::Vector3<f64>;
         let mut depth_difference: f64;
         for object in objects.iter(){
             for point in object.get_points().iter(){
@@ -302,8 +308,9 @@ impl Camera{
                 
                 //creating new unit vectors for the local coordinates of the camera that are facing
                 //the way the camera faces
+                 
                 let unit_vector_x = self.orientation * Point::new(1.0,0.0,0.0,1.0).point_ignore_w(); 
-                let unit_vector_y = self.orientation * Point::new(0.0,1.0,0.0,1.0).point_ignore_w(); 
+                let unit_vector_y = self.orientation * Point::new(0.0,1.0,0.0,1.0).point_ignore_w();
                 let unit_vector_z = self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w(); 
                 
                 //manually making a matrix where each column is one of the unit vectors.
@@ -313,9 +320,17 @@ impl Camera{
                     unit_vector_x.z, unit_vector_y.z, unit_vector_z.z 
                 );
                 //apply change of basis to get truly camera oriented coords
-                local_point = (basis_change_matrix * point.clone().point_ignore_w());
+                let local_point_world_coords: na::Vector4::<f64>= self.extrinsics_inverse * point.clone().point_to_vector();
+                local_point = basis_change_matrix * na::Vector3::new(
+                    local_point_world_coords.x,
+                    local_point_world_coords.y,
+                    local_point_world_coords.z
+                );
                 depth_difference = local_point.z;
-
+                
+                print!("point: {:?}\n",depth_difference);
+                print!("the moved point in local coords:{:?}\n", local_point);
+                print!("depth_difference: {:?}\n",depth_difference);
 
                 if depth_difference >= self.min_depth_difference{
                     visible_objects.push(object.clone());
