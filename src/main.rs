@@ -28,13 +28,15 @@ use tao::window::{WindowBuilder};
 fn main() -> Result<(), Error> {
     let mut worldspace: WorldSpace = WorldSpace::new();
     let mut camera = Camera::new();
-    camera.update_extrinsics_centre(Point::new(-1.0,0.0,0.0,1.0));
-//    camera.rotate(na::Matrix3::new(0.707107, 0.0, 0.707107,
-//          0.0, 1.0, 0.0,
-//          -0.707107, 0.0, 0.707107));
-    camera.rotate(na::Matrix3::new(1.0, 0.0, 1.0,
-          0.0, 1.0, 0.0,
-          -1.0, 0.0, 1.0));
+    camera.update_extrinsics_centre(Point::new(0.0,0.0,0.0,1.0));
+    //camera.rotate(na::Matrix3::new(0.707107, 0.0, 0.707107,
+    //    0.0, 1.0, 0.0,
+    //    -0.707107, 0.0, 0.707107));
+
+    //camera.rotate(na::Matrix3::new(0.0, 0.0, 1.0,
+    //  0.0, 1.0, 0.0,
+    //  1.0, 0.0, 0.0)); 
+    camera.rotate_degrees_y(90.0);
     worldspace.register_object(coordinate_object::Camera_object(camera));
     worldspace.register_object(coordinate_object::Point_object(Point::new(-0.5,0.0,0.5,1.0)));
     worldspace.register_object(coordinate_object::Point_object(Point::new(0.0,-0.7071072,0.707107,1.0)));

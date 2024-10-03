@@ -327,6 +327,7 @@ impl Camera{
                 
                 //apply change of basis to get truly camera oriented coords
                 let local_point_world_coords: na::Vector4::<f64>= self.extrinsics_inverse * point.clone().point_to_vector();
+                print!("basis matrix: {:?}",self.basis_change_matrix);
                 local_point = self.basis_change_matrix * na::Vector3::new(
                     local_point_world_coords.x,
                     local_point_world_coords.y,
@@ -334,8 +335,9 @@ impl Camera{
                 );
                 depth_difference = local_point.z;
                 
-                print!("point: {:?}\n",depth_difference);
+                print!("point: {:?}\n",point);
                 print!("the moved point in local coords:{:?}\n", local_point);
+                print!("the half moved point in coords relative to the camera:{:?}\n", local_point_world_coords);
                 print!("depth_difference: {:?}\n",depth_difference);
 
                 if depth_difference >= self.min_depth_difference{
@@ -360,6 +362,45 @@ impl Camera{
         }
         return_values
     }
+    pub fn rotate_degrees_x(&mut self, to_rotate_by: f64){
+        let in_radians: f64 = to_rotate_by * (std::f64::consts::PI/180.0);
+        let sin: f64 = in_radians.sin();
+        let cos: f64 = in_radians.cos();
+
+        self.rotate(
+            na::Matrix3::new(
+                1.0, 0.0, 0.0,
+                0.0, cos, -sin,
+                0.0, sin, cos,
+                )
+            );
+    }
+    pub fn rotate_degrees_y(&mut self, to_rotate_by: f64){
+        let in_radians: f64 = to_rotate_by * (std::f64::consts::PI/180.0);
+        let sin: f64 = in_radians.sin();
+        let cos: f64 = in_radians.cos();
+        self.rotate(
+            na::Matrix3::new(
+                cos, 0.0, sin,
+                0.0, 1.0, 0.0,
+                -sin, 0.0, cos,
+                )
+            );
+    }
+    pub fn rotate_degrees_z(&mut self, to_rotate_by: f64){
+        let in_radians: f64 = to_rotate_by * (std::f64::consts::PI/180.0);
+        let sin: f64 = in_radians.sin();
+        let cos: f64 = in_radians.cos();
+
+        self.rotate(
+            na::Matrix3::new(
+                cos, -sin, 0.0,
+                0.0, sin, cos,
+                0.0, 0.0, 1.0,
+                )
+            );
+    }
+
 }
 //These are definitely subject to change as they will need to update the callibration matrix and/or
 //the camera extrinsics 
@@ -371,7 +412,7 @@ impl Translatable for Camera{
 impl Rotatable for Camera{
     fn rotate(&mut self, to_rotate_by: na::Matrix3<f64>){
      self.orientation = self.orientation * to_rotate_by;
-    }
+    } 
 }
 impl Point_Construct for Camera{
     fn get_points(&self) -> Vec<Point>{
