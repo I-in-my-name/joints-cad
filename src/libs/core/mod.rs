@@ -213,6 +213,7 @@ pub struct Camera {
     camera_extrinsics: na::Matrix4<f64>,
     extrinsics_inverse: na::Matrix4<f64>,
     camera_matrix_superior:  na::Matrix4<f64>,
+    basis_change_matrix: na::Matrix3<f64>,
     fov_y: f64,
     fov_x: f64,
     screen_x: u8,
@@ -229,6 +230,7 @@ impl Camera{
             camera_extrinsics: na::Matrix4::<f64>::zeros(),
             extrinsics_inverse: na::Matrix4::<f64>::zeros(),
             camera_matrix_superior: na::Matrix4::<f64>::zeros(),
+            basis_change_matrix: na::Matrix3::<f64>::zeros(),
             fov_y: 90.0,
             fov_x: 90.0,
             screen_x: 128,
@@ -294,9 +296,26 @@ impl Camera{
     pub fn to_local_coords(&self, point: Point) -> Point{
         Point::vector_to_point(self.extrinsics_inverse * point.point_to_vector()) 
     }
-    pub fn return_visible_objects(&self, objects: &Vec<coordinate_object>) -> Vec<coordinate_object>{
+    pub fn update_basis_change_matrix(&mut self){
+        //creating new unit vectors for the local coordinates of the camera that are facing
+        //the way the camera faces
+                
+        let unit_vector_x = self.orientation * Point::new(1.0,0.0,0.0,1.0).point_ignore_w(); 
+        let unit_vector_y = self.orientation * Point::new(0.0,1.0,0.0,1.0).point_ignore_w();
+        let unit_vector_z = self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w(); 
+                
+        //manually making a matrix where each column is one of the unit vectors.
+        self.basis_change_matrix = na::Matrix3::new(
+        unit_vector_x.x, unit_vector_y.x, unit_vector_z.x, 
+        unit_vector_x.y, unit_vector_y.y, unit_vector_z.y,
+        unit_vector_x.z, unit_vector_y.z, unit_vector_z.z 
+                );
+
+    }
+    //output from this functiom is not mutable for borrowing and logical, purposes
+    pub fn return_visible_objects<'a>(& 'a self, objects: & 'a Vec<coordinate_object>) -> Vec<&coordinate_object>{
         //predeclare before for loop
-        let mut visible_objects: Vec<coordinate_object> = vec![];
+        let mut visible_objects: Vec<& coordinate_object> = vec![];
         let mut local_point: na::Vector3<f64>;
         let mut depth_difference: f64;
         for object in objects.iter(){
@@ -306,22 +325,9 @@ impl Camera{
                 //used to render objects and not here (it would invalidate lines longer than the
                 //max difference)
                 
-                //creating new unit vectors for the local coordinates of the camera that are facing
-                //the way the camera faces
-                 
-                let unit_vector_x = self.orientation * Point::new(1.0,0.0,0.0,1.0).point_ignore_w(); 
-                let unit_vector_y = self.orientation * Point::new(0.0,1.0,0.0,1.0).point_ignore_w();
-                let unit_vector_z = self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w(); 
-                
-                //manually making a matrix where each column is one of the unit vectors.
-                let basis_change_matrix = na::Matrix3::new(
-                    unit_vector_x.x, unit_vector_y.x, unit_vector_z.x, 
-                    unit_vector_x.y, unit_vector_y.y, unit_vector_z.y,
-                    unit_vector_x.z, unit_vector_y.z, unit_vector_z.z 
-                );
                 //apply change of basis to get truly camera oriented coords
                 let local_point_world_coords: na::Vector4::<f64>= self.extrinsics_inverse * point.clone().point_to_vector();
-                local_point = basis_change_matrix * na::Vector3::new(
+                local_point = self.basis_change_matrix * na::Vector3::new(
                     local_point_world_coords.x,
                     local_point_world_coords.y,
                     local_point_world_coords.z
@@ -333,22 +339,21 @@ impl Camera{
                 print!("depth_difference: {:?}\n",depth_difference);
 
                 if depth_difference >= self.min_depth_difference{
-                    visible_objects.push(object.clone());
+                    visible_objects.push(&object);
                     break;
                 }
             }
         }
         visible_objects
     }
-    pub fn get_screen_values(&self, objects: &Vec<coordinate_object>) -> Vec<u8>{
+    pub fn get_screen_values(&mut self, objects: &Vec<coordinate_object>) -> Vec<u8>{
         let mut return_values: Vec<u8> = vec![0; (self.screen_x * self.screen_y) as usize];
-        let mut visible_objects: Vec<coordinate_object> = self.return_visible_objects(objects);
+        let mut visible_objects: Vec<&coordinate_object> = self.return_visible_objects(objects);
         let mut temp_vec: na::Vector4<f64>;
 
         for vis_obj in visible_objects.iter(){
             match vis_obj{
-                coordinate_object::Point_object(point) => {temp_vec = self.camera_matrix_superior * Point::point_to_vector(&point);
-                print!("TP : {:?}\n", temp_vec);
+                coordinate_object::Point_object(point) => {
                     },
                 _ => (),
             }

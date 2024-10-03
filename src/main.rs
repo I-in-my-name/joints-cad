@@ -23,20 +23,25 @@ use tao::event_loop::{ControlFlow, EventLoop};
 use tao::keyboard::KeyCode;
 use tao::window::{WindowBuilder};
 
+
+
 fn main() -> Result<(), Error> {
-    let mut worldspace = WorldSpace::new();
+    let mut worldspace: WorldSpace = WorldSpace::new();
     let mut camera = Camera::new();
-    camera.update_extrinsics_centre(Point::new(1.0,0.0,-1.0,1.0));
-    camera.rotate(na::Matrix3::new(0.707107, 0.0, 0.707107,
+    camera.update_extrinsics_centre(Point::new(-1.0,0.0,0.0,1.0));
+//    camera.rotate(na::Matrix3::new(0.707107, 0.0, 0.707107,
+//          0.0, 1.0, 0.0,
+//          -0.707107, 0.0, 0.707107));
+    camera.rotate(na::Matrix3::new(1.0, 0.0, 1.0,
           0.0, 1.0, 0.0,
-          -0.707107, 0.0, 0.707107));
+          -1.0, 0.0, 1.0));
     worldspace.register_object(coordinate_object::Camera_object(camera));
     worldspace.register_object(coordinate_object::Point_object(Point::new(-0.5,0.0,0.5,1.0)));
     worldspace.register_object(coordinate_object::Point_object(Point::new(0.0,-0.7071072,0.707107,1.0)));
-    let mut visible_objects: Vec<coordinate_object>;
-    for camera in worldspace.cameras.iter(){
+    let mut visible_objects: Vec<&coordinate_object>;
+    worldspace.update_cameras();
+    for mut camera in worldspace.reference_to_cameras(){
         visible_objects = worldspace.get_visible_objects(camera);
-   //   print!("below \\/");
         print!("{:?}",visible_objects);
     }
 
@@ -53,13 +58,7 @@ struct WorldSpace {
 impl WorldSpace{
     fn new() -> Self{
         WorldSpace{
-            all_independents: vec![
-      //          Line_object(Line::new(Point::new(100.0,0.0,0.0,1.0),Point::new(-100.0,0.0,0.0,1.0))),
-
-        //        Line_object(Line::new(Point::new(0.0,100.0,0.0,1.0),Point::new(0.0,-100.0,0.0,1.0))),
-                
-          //      Line_object(Line::new(Point::new(0.0,0.0,100.0,1.0),Point::new(0.0,0.0,-100.0,1.0)))
-            ],
+            all_independents: vec![],
             cameras: vec![],
         }
     }
@@ -69,13 +68,25 @@ impl WorldSpace{
             _ => self.all_independents.push(object),
         };
     }
+    fn reference_to_cameras(&self) -> Vec<&Camera>{
+        let mut vec: Vec<&Camera> = vec![];
+        for camera in self.cameras.iter(){
+            vec.push(camera);
+        }
+        vec
+    }
+    fn update_cameras(&mut self){
+        for camera in self.cameras.iter_mut(){
+            camera.update_basis_change_matrix();
+        }
+    }
 
     //With the cameras Extrinsics matrix, we can use the inverse to effectively translate to a new
     //coordinate system around the camera, allowing for easier and clearer logic.
-    fn get_visible_objects(&self, camera: &Camera) -> Vec<coordinate_object>{
-        camera.return_visible_objects(&self.all_independents.clone())
+    fn get_visible_objects<'a>(& 'a self, camera: & 'a Camera) -> Vec<&coordinate_object>{
+        camera.return_visible_objects(&self.all_independents)
     }
-    fn get_screen_values(&self, camera: &Camera) -> Vec<u8>{
+    fn get_screen_values(&self, camera: &mut Camera) -> Vec<u8>{
     //We want to order these as local points by their depth (greatest to smallest and apply all in
     //that order).
     camera.get_screen_values(&self.all_independents)
