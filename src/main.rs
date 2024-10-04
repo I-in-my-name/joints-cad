@@ -20,7 +20,7 @@ use log::error;
 use pixels::{Error, Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
-use winit::event_loop::{EventLoop,ActiveEventLoop};
+use winit::event_loop::{EventLoop,ActiveEventLoop,ControlFlow};
 use winit::keyboard::KeyCode;
 use winit::window::{WindowId,Window};
 use winit::application::ApplicationHandler;
@@ -61,11 +61,10 @@ fn main() -> Result<(), Error> {
         }
     }
     //print!("Above /\\");
-    let pixels = PixelsApplication::new()?;
-
-    thread::sleep(Duration::new(15,0));
-
-    
+    let mut pixels = PixelsApplication::new()?;
+    pixels.run_app();
+    thread::sleep(Duration::new(1,0));
+    pixels.draw_to_window();
     Ok(())
 }
 
@@ -111,11 +110,10 @@ impl WorldSpace{
     }
 }
 struct PixelsApplication{
-    pixels: Pixels,
     event_loop: EventLoop<()>,
-    window: Window,
+    subhandler: Option<Subhandler>,
 }
-impl PixelsApplication {
+impl PixelsApplication{
     pub fn new() -> Result<Self, Error>{
         env_logger::init();
         let mut event_loop = EventLoop::new().unwrap();
@@ -125,26 +123,47 @@ impl PixelsApplication {
             Ok(window) => window,
             _ => panic!(),
         };
-
-        //window.set_maximized(true);
-        match window.current_monitor() {
-            Some(monitor) => window.set_min_inner_size(Some(monitor.size())),
-             _ => (),
-        };
         let mut new_pixels = {
             let window_size = window.inner_size();
             let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
             Pixels::new(window_size.width, window_size.height , surface_texture)?
         };
-
-        Ok(PixelsApplication{
-            pixels: new_pixels,
+        event_loop.set_control_flow(ControlFlow::Poll);
+        
+        let mut pixapp = PixelsApplication{
             event_loop: event_loop,
-            window: window,
-            })
-        }
+            subhandler: None,
+        };
+        pixapp.set_handler(Some(Subhandler::new(window,new_pixels,)));
+        Ok(pixapp)
+    }
+
+    pub fn draw_to_window(&mut self){
+        self.subhandler.as_mut().unwrap().redraw();
+    }
+    pub fn set_handler(&mut self, new_handler: Option<Subhandler>){
+        self.subhandler = new_handler;
+    }
+    pub fn run_app(&self){
+        self.event_loop.run_app(&mut self.subhandler.unwrap()); 
+    }
 }
-impl ApplicationHandler for PixelsApplication{
+struct Subhandler{
+    pixels: &Pixels,
+    window: Window,
+}
+impl Subhandler{
+    pub fn new(window: Window, pixels: Pixels) -> Self{
+        Subhandler {
+            pixels: pixels,
+            window: window,
+        }
+    }
+    pub fn redraw(&self){
+        self.window.request_redraw();
+    }
+}
+impl ApplicationHandler for Subhandler{
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.window = event_loop.create_window(Window::default_attributes()).unwrap();
     }
@@ -155,10 +174,11 @@ impl ApplicationHandler for PixelsApplication{
                 event_loop.exit();
             },
             WindowEvent::RedrawRequested => {
-                self.window.request_redraw();
-            }
-            _ => (),
+                print!("REQ");
+            },
+            _ => {print!("heh?");},
         }
     
     } 
 }
+
