@@ -9,4 +9,4 @@ env_logger = "0.11.5"
 error-iter = "0.4.1"
 log = "0.4.22"
 pixels = "0.13.0"
-tao = "0.23.0"
+winit = {version = "0.30.5", features = ["rwh_05"]}

@@ -13,15 +13,17 @@ mod libs{
 //Crates for pixels and the display
 #[deny(clippy::all)]
 #[forbid(unsafe_code)]
-use std::{thread, time};
+use std::{thread, env};
+use std::time::{Duration};
 use error_iter::ErrorIter as _;
 use log::error;
 use pixels::{Error, Pixels, SurfaceTexture};
-use tao::dpi::LogicalSize;
-use tao::event::{Event, KeyEvent, WindowEvent};
-use tao::event_loop::{ControlFlow, EventLoop};
-use tao::keyboard::KeyCode;
-use tao::window::{WindowBuilder};
+use winit::dpi::LogicalSize;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{EventLoop,ActiveEventLoop};
+use winit::keyboard::KeyCode;
+use winit::window::{WindowId,Window};
+use winit::application::ApplicationHandler;
 
 
 
@@ -38,18 +40,32 @@ fn main() -> Result<(), Error> {
     //  1.0, 0.0, 0.0)); 
     camera.rotate_degrees_y(90.0);
     worldspace.register_object(coordinate_object::Camera_object(camera));
-    worldspace.register_object(coordinate_object::Point_object(Point::new(-0.5,0.0,0.5,1.0)));
+    //worldspace.register_object(coordinate_object::Point_object(Point::new(-20.0,0.0,0.5,1.0)));
+    worldspace.register_object(coordinate_object::Point_object(Point::new(-100.0,40.0,200.0,1.0)));
     worldspace.register_object(coordinate_object::Point_object(Point::new(0.0,-0.7071072,0.707107,1.0)));
     let mut visible_objects: Vec<&coordinate_object>;
     worldspace.update_cameras();
     for mut camera in worldspace.reference_to_cameras(){
         visible_objects = worldspace.get_visible_objects(camera);
         print!("{:?}",visible_objects);
+        let string: Vec<char> = vec![];
+        for (i,pixel) in worldspace.get_screen_values(camera).into_iter().enumerate(){
+            if i % 128 == 0{
+                print!("\n");
+            }
+            if pixel == [0x5e, 0x48, 0xe8, 0xff]{
+                print!("#");
+            }else{
+                print!(".");
+            }
+        }
     }
-
     //print!("Above /\\");
-    let pixels = PixelsStruct::new()?;
-    //pixels.game()
+    let pixels = PixelsApplication::new()?;
+
+    thread::sleep(Duration::new(15,0));
+
+    
     Ok(())
 }
 
@@ -88,33 +104,31 @@ impl WorldSpace{
     fn get_visible_objects<'a>(& 'a self, camera: & 'a Camera) -> Vec<&coordinate_object>{
         camera.return_visible_objects(&self.all_independents)
     }
-    fn get_screen_values(&self, camera: &mut Camera) -> Vec<u8>{
+    fn get_screen_values(&self, camera: & Camera) -> Vec<[u8;4]>{
     //We want to order these as local points by their depth (greatest to smallest and apply all in
     //that order).
     camera.get_screen_values(&self.all_independents)
     }
 }
-struct PixelsStruct{
+struct PixelsApplication{
     pixels: Pixels,
     event_loop: EventLoop<()>,
+    window: Window,
 }
-impl PixelsStruct {
+impl PixelsApplication {
     pub fn new() -> Result<Self, Error>{
-    env_logger::init();
-        let new_event_loop = EventLoop::new();
+        env_logger::init();
+        let mut event_loop = EventLoop::new().unwrap();
         let default_size = LogicalSize::new(128.0,128.0);
-        let window = {
-            WindowBuilder::new()
-                .with_title("The Grand CAD Environment")
-                .with_inner_size(default_size)
-                .with_min_inner_size(default_size)
-                .build(&new_event_loop)
-                .unwrap()
+        let mut window_grabbed = event_loop.create_window(Window::default_attributes()); 
+        let mut window = match window_grabbed {
+            Ok(window) => window,
+            _ => panic!(),
         };
-        window.set_decorations(true);
+
         //window.set_maximized(true);
         match window.current_monitor() {
-            Some(monitor) => window.set_inner_size(monitor.size()),
+            Some(monitor) => window.set_min_inner_size(Some(monitor.size())),
              _ => (),
         };
         let mut new_pixels = {
@@ -122,24 +136,29 @@ impl PixelsStruct {
             let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
             Pixels::new(window_size.width, window_size.height , surface_texture)?
         };
-        Ok(PixelsStruct{
+
+        Ok(PixelsApplication{
             pixels: new_pixels,
-            event_loop: new_event_loop,
+            event_loop: event_loop,
+            window: window,
             })
         }
-    pub fn game(self) -> Result<(), Error> {
-            
-        self.event_loop.run(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Wait;
-        
-            match event {
-                Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    ..
-                } => *control_flow = ControlFlow::Exit,
-                _ => (),
-            }
-        });
-    }
 }
+impl ApplicationHandler for PixelsApplication{
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        self.window = event_loop.create_window(Window::default_attributes()).unwrap();
+    }
 
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
+        match event {
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
+            },
+            WindowEvent::RedrawRequested => {
+                self.window.request_redraw();
+            }
+            _ => (),
+        }
+    
+    } 
+}

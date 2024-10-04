@@ -216,8 +216,8 @@ pub struct Camera {
     basis_change_matrix: na::Matrix3<f64>,
     fov_y: f64,
     fov_x: f64,
-    screen_x: u8,
-    screen_y: u8,
+    screen_x: i16,
+    screen_y: i16,
     min_depth_difference: f64,
     max_depth_difference: f64,
 }
@@ -236,7 +236,7 @@ impl Camera{
             screen_x: 128,
             screen_y:128,
             min_depth_difference: 2.0,
-            max_depth_difference: 120.0,
+            max_depth_difference: 1200.0,
         };
         new_camera.update_extrinsics_centre(Point::new(0.0,0.0,1.0,1.0));
         new_camera.update_intrinsics();
@@ -293,8 +293,15 @@ impl Camera{
     pub fn update_superior_matrix(&mut self){
         self.camera_matrix_superior = self.calibration_matrix * self.camera_extrinsics;
     }
-    pub fn to_local_coords(&self, point: Point) -> Point{
-        Point::vector_to_point(self.extrinsics_inverse * point.point_to_vector()) 
+    pub fn to_local_coords_vec(&self, point: Point) -> na::Vector3<f64>{               
+            //apply change of basis to get truly camera oriented coords
+            let local_point_world_coords: na::Vector4::<f64>= self.extrinsics_inverse * point.clone().point_to_vector();
+            print!("basis matrix: {:?}",self.basis_change_matrix);
+            self.basis_change_matrix * na::Vector3::new(
+                local_point_world_coords.x,
+                local_point_world_coords.y,
+                local_point_world_coords.z
+            )
     }
     pub fn update_basis_change_matrix(&mut self){
         //creating new unit vectors for the local coordinates of the camera that are facing
@@ -324,43 +331,71 @@ impl Camera{
                 //front of us with a point really far away, this is why the max_depth_difference is
                 //used to render objects and not here (it would invalidate lines longer than the
                 //max difference)
-                
-                //apply change of basis to get truly camera oriented coords
-                let local_point_world_coords: na::Vector4::<f64>= self.extrinsics_inverse * point.clone().point_to_vector();
-                print!("basis matrix: {:?}",self.basis_change_matrix);
-                local_point = self.basis_change_matrix * na::Vector3::new(
-                    local_point_world_coords.x,
-                    local_point_world_coords.y,
-                    local_point_world_coords.z
-                );
+                local_point = self.to_local_coords_vec(*point);
                 depth_difference = local_point.z;
                 
                 print!("point: {:?}\n",point);
                 print!("the moved point in local coords:{:?}\n", local_point);
-                print!("the half moved point in coords relative to the camera:{:?}\n", local_point_world_coords);
                 print!("depth_difference: {:?}\n",depth_difference);
 
                 if depth_difference >= self.min_depth_difference{
-                    visible_objects.push(&object);
+                visible_objects.push(&object);
                     break;
                 }
             }
         }
         visible_objects
     }
-    pub fn get_screen_values(&mut self, objects: &Vec<coordinate_object>) -> Vec<u8>{
-        let mut return_values: Vec<u8> = vec![0; (self.screen_x * self.screen_y) as usize];
+
+    pub fn get_screen_values(&self, objects: &Vec<coordinate_object>) -> Vec<[u8;4]>{
+        let mut pixel_buffer: Vec<[u8;4]> = vec![];
+        for i in 0..(self.screen_x * self.screen_y ){
+            pixel_buffer.push([0,0,0,0]);
+        }
         let mut visible_objects: Vec<&coordinate_object> = self.return_visible_objects(objects);
         let mut temp_vec: na::Vector4<f64>;
 
         for vis_obj in visible_objects.iter(){
             match vis_obj{
                 coordinate_object::Point_object(point) => {
+                        match self.point_to_screen_position(*point){
+                            (x,y,w) => {
+                                let x: i16 = x as i16;
+                                let y: i16 = y as i16;
+                                let w: i16 = w as i16;
+                                let mut factor: f64 = ((self.screen_y - w) as f64 ) * 0.25;
+                                if factor < 0.0 {
+                                    factor = 1.0;
+                                }
+                                let factor = factor as i16;
+                                let camera_centre_x = self.centre.point_to_vector().x as i16; 
+                                let camera_centre_y = self.centre.point_to_vector().y as i16;
+
+                                let lower_x = x - factor/2;
+                                let lower_y = y - factor/2;
+                                //cycles through each pixel in a range around the point 
+                                for x_i in lower_x .. (x + factor/2){
+                                    for y_i in lower_y .. (y + factor/2){
+                                        //because of the slice representation, we need to calulate
+                                        //the pixel value like this
+                                        if (-self.screen_y/2 <= y_i && y_i <= self.screen_y/2 &&
+                                            -self.screen_x/2 <= x_i && x_i <= self.screen_x/2 ){
+                                            pixel_buffer[((y_i +  self.screen_y/2) * self.screen_x + (x_i + self.screen_x/2)) as usize] = [0x5e, 0x48, 0xe8, 0xff];
+                                        }
+                                    }
+                                }
+                            },
+                        };
                     },
                 _ => (),
             }
         }
-        return_values
+        pixel_buffer
+    }
+    //camera needs to be updated before this function can be called
+    fn point_to_screen_position(&self, point: Point) -> (f64,f64,f64){
+        let point_in_parts = self.to_local_coords_vec(point);
+        (point_in_parts.x / point_in_parts.z, point_in_parts.y/point_in_parts.z, point_in_parts.z)
     }
     pub fn rotate_degrees_x(&mut self, to_rotate_by: f64){
         let in_radians: f64 = to_rotate_by * (std::f64::consts::PI/180.0);
@@ -395,7 +430,7 @@ impl Camera{
         self.rotate(
             na::Matrix3::new(
                 cos, -sin, 0.0,
-                0.0, sin, cos,
+                sin, cos, 0.0,
                 0.0, 0.0, 1.0,
                 )
             );
