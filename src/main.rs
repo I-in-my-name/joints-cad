@@ -19,9 +19,11 @@ use error_iter::ErrorIter as _;
 use log::error;
 use pixels::{Error, Pixels, SurfaceTexture};
 use winit::dpi::{LogicalSize, PhysicalSize};
-use winit::event::{Event, WindowEvent};
+use winit::event::*;
 use winit::event_loop::{EventLoop,ActiveEventLoop,ControlFlow};
 use winit::keyboard::KeyCode;
+use winit::event::DeviceEvent::*;
+use winit::event::WindowEvent::*;
 use winit::window::{WindowId,Window};
 use winit::application::ApplicationHandler;
 
@@ -182,10 +184,51 @@ impl ApplicationHandler for Subhandler{
             WindowEvent::RedrawRequested => {
                 print!("REQ");
             },
-            _ => {//print!("{:?}",event_loop);
+            WindowEvent::CursorMoved{
+                device_id,
+                position,
+            } => {
+                print!("ah");
             },
+            WindowEvent::MouseWheel {
+                device_id: id,
+                delta: delta,
+                phase: phase,
+            } => {
+                print!("{:?}",delta);
+            },
+            _ =>{},
         }
     
     } 
+    fn device_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        device_id: DeviceId,
+        event: DeviceEvent,
+    ){
+        match event{
+            DeviceEvent::Key(rawEvent) => {
+                match rawEvent{
+                    RawKeyEvent{physical_key, state} => {
+                        print!("key:   {:?}",physical_key);
+                    },
+                    _ => {print!("YYY");}, 
+                };
+            },
+            DeviceEvent::MouseMotion {
+                delta: (a, b),
+            } => {
+                print!("MOUSE");
+            },
+
+            DeviceEvent::MouseWheel {
+                delta: delta,
+            } => {
+                print!("SCROLL");
+            }
+            _ => {},
+        };
+    }
 }
 
