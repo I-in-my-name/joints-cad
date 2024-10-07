@@ -216,8 +216,8 @@ pub struct Camera {
     basis_change_matrix: na::Matrix3<f64>,
     fov_y: f64,
     fov_x: f64,
-    screen_x: i16,
-    screen_y: i16,
+    screen_x: i32,
+    screen_y: i32,
     min_depth_difference: f64,
     max_depth_difference: f64,
 }
@@ -288,6 +288,10 @@ impl Camera{
                 0.0, 0.0, 1.0,                 0.0,
                 0.0, 0.0, 0.0,                 1.0
             );
+    }
+    pub fn update_screen_size(&mut self, width: i32, height: i32){
+        self.screen_x = width;
+        self.screen_y = height;
     }
     //if 3x4 is fine then refactor necessary, check after tracer code is working 
     pub fn update_superior_matrix(&mut self){
@@ -360,16 +364,16 @@ impl Camera{
                 coordinate_object::Point_object(point) => {
                         match self.point_to_screen_position(*point){
                             (x,y,w) => {
-                                let x: i16 = x as i16;
-                                let y: i16 = y as i16;
-                                let w: i16 = w as i16;
+                                let x: i32 = x as i32;
+                                let y: i32 = y as i32;
+                                let w: i32 = w as i32;
                                 let mut factor: f64 = ((self.screen_y - w) as f64 ) * 0.25;
                                 if factor < 0.0 {
                                     factor = 1.0;
                                 }
-                                let factor = factor as i16;
-                                let camera_centre_x = self.centre.point_to_vector().x as i16; 
-                                let camera_centre_y = self.centre.point_to_vector().y as i16;
+                                let factor = factor as i32;
+                                let camera_centre_x = self.centre.point_to_vector().x as i32; 
+                                let camera_centre_y = self.centre.point_to_vector().y as i32;
 
                                 let lower_x = x - factor/2;
                                 let lower_y = y - factor/2;
