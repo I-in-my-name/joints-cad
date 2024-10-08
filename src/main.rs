@@ -31,6 +31,7 @@ use winit::application::ApplicationHandler;
 
 fn main() -> Result<(), Error> {
     let mut pixels = PixelsApplication::new()?;
+    
     pixels.run_app();
     thread::sleep(Duration::new(3,0));
     Ok(())
@@ -57,10 +58,11 @@ impl WorldSpace{
         //camera.rotate(na::Matrix3::new(0.0, 0.0, 1.0,
         //  0.0, 1.0, 0.0,
         //  1.0, 0.0, 0.0)); 
-        camera.rotate_degrees_y(90.0);
+        //camera.rotate_degrees_y(90.0);
         self.register_object(coordinate_object::Camera_object(camera));
         //worldspace.register_object(coordinate_object::Point_object(Point::new(-20.0,0.0,0.5,1.0)));
         self.register_object(coordinate_object::Point_object(Point::new(-100.0,40.0,200.0,1.0)));
+        //self.register_object(coordinate_object::Point_object(Point::new(-10.0,0.0,0.0,1.0)));
         self.register_object(coordinate_object::Point_object(Point::new(0.0,-0.7071072,0.707107,1.0)));
         let mut visible_objects: Vec<&coordinate_object>;
         self.update_cameras();
@@ -80,10 +82,12 @@ impl WorldSpace{
     }
     fn update_cameras(&mut self){
         for camera in self.cameras.iter_mut(){
-            camera.update_basis_change_matrix();
+            camera.update_camera();
+
         }
     }
     fn get_new_pixels(&self, pixels: &mut Pixels,  size: PhysicalSize<u32>){
+        //print!("\n\n\n\n\n\n\n\n\n\ncams: {:?}\n\n\n\n\n\n\n\n\n\n\n",self.reference_to_cameras().pop().unwrap().orientation);
         for mut camera in self.reference_to_cameras(){
             let mut colour;
             colour = self.get_screen_values(camera);
@@ -151,6 +155,8 @@ struct Subhandler{
     pixels: Pixels,
     window: Window,
     worldspace: WorldSpace,
+
+    right_mouse_button: bool,
 }
 impl Subhandler{
     pub fn new(window: Window, pixels: Pixels) -> Self{ 
@@ -169,6 +175,7 @@ impl Subhandler{
 impl ApplicationHandler for Subhandler{
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         print!("resumed/started app");
+        //self.window = event_loop.create_window(Window::default_attributes()).unwrap();
         self.worldspace.setup();
         self.worldspace.update_size(self.window.inner_size());
         self.worldspace.get_new_pixels(&mut self.pixels,self.window.inner_size());
@@ -181,15 +188,35 @@ impl ApplicationHandler for Subhandler{
                 event_loop.exit();
                 print!("finished");
             },
-            WindowEvent::RedrawRequested => {
+           WindowEvent::RedrawRequested => {
                 print!("REQ");
+                self.worldspace.get_new_pixels(&mut self.pixels,self.window.inner_size());
+                self.pixels.render();
             },
             WindowEvent::CursorMoved{
                 device_id,
                 position,
             } => {
-                print!("ah");
+                self.worldspace.cameras[0].rotate_degrees_y(1.0);
+                self.worldspace.cameras[0].update_camera();
+
+
+                thread::sleep(Duration::new(0,10));
+
+                self.redraw();
             },
+            WindowEvent::MouseInput{
+                device_id: DeviceId,
+                state: ElementState,
+                button: MouseButton,} => {
+                    match button {
+                        Right => match state{ 
+                            Pressed => self.right_mouse_button = true, 
+                            Released => self.right_mouse_button = false,
+                            },
+                        _ => {},
+                    };
+                },
             WindowEvent::MouseWheel {
                 device_id: id,
                 delta: delta,
@@ -219,7 +246,7 @@ impl ApplicationHandler for Subhandler{
             DeviceEvent::MouseMotion {
                 delta: (a, b),
             } => {
-                print!("MOUSE");
+                //print!("MOUSE");
             },
 
             DeviceEvent::MouseWheel {

@@ -207,7 +207,7 @@ impl Point_Construct for PerspectiveObject{
 
 #[derive(Clone,Debug)]
 pub struct Camera {
-    orientation: na::Matrix3<f64>,
+    pub orientation: na::Matrix3<f64>,
     centre: Point,
     calibration_matrix: na::Matrix4<f64>,
     camera_extrinsics: na::Matrix4<f64>,
@@ -261,14 +261,15 @@ impl Camera{
             );
         self.extrinsics_inverse = self.camera_extrinsics.clone();
         match self.extrinsics_inverse.try_inverse_mut(){
-            true => (), 
-            _ => self.extrinsics_inverse = 
+            true => ({print!("no matrix issues!")}), 
+            _ => { print!("uninversible matrix error!");
+                self.extrinsics_inverse = 
                 na::Matrix4::new( 
                 1.0, 0.0, 0.0, 0.0,
                 0.0, 1.0, 0.0, 0.0,
                 0.0, 0.0, 1.0, 0.0,
                 0.0, 0.0, 0.0, 1.0,
-                ), 
+                )}, 
         };
         
     }
@@ -300,8 +301,9 @@ impl Camera{
     pub fn to_local_coords_vec(&self, point: Point) -> na::Vector3<f64>{               
             //apply change of basis to get truly camera oriented coords
             let local_point_world_coords: na::Vector4::<f64>= self.extrinsics_inverse * point.clone().point_to_vector();
-            print!("basis matrix: {:?}",self.basis_change_matrix);
-            self.basis_change_matrix * na::Vector3::new(
+            print!("\ninverse:{:?}\n", self.extrinsics_inverse);
+            print!("\nbasis matrix: {:?}\n",self.basis_change_matrix);
+            na::Vector3::new(
                 local_point_world_coords.x,
                 local_point_world_coords.y,
                 local_point_world_coords.z
@@ -323,6 +325,11 @@ impl Camera{
                 );
 
     }
+    pub fn update_camera(&mut self){
+        self.update_extrinsics(self.centre, self.orientation);
+        self.update_basis_change_matrix();
+
+    }
     //output from this functiom is not mutable for borrowing and logical, purposes
     pub fn return_visible_objects<'a>(& 'a self, objects: & 'a Vec<coordinate_object>) -> Vec<&coordinate_object>{
         //predeclare before for loop
@@ -337,10 +344,12 @@ impl Camera{
                 //max difference)
                 local_point = self.to_local_coords_vec(*point);
                 depth_difference = local_point.z;
+
+                //print!("\n{:?}\n",self.orientation);
                 
                 print!("point: {:?}\n",point);
-                print!("the moved point in local coords:{:?}\n", local_point);
-                print!("depth_difference: {:?}\n",depth_difference);
+                print!("the moved point in local coords point C:{:?}\n", local_point);
+                //print!("depth_difference: {:?}\n",depth_difference);
 
                 if depth_difference >= self.min_depth_difference{
                 visible_objects.push(&object);
@@ -364,6 +373,7 @@ impl Camera{
                 coordinate_object::Point_object(point) => {
                         match self.point_to_screen_position(*point){
                             (x,y,w) => {
+                                print!("{:?} {:?} {:?}",x,y,w);
                                 let x: i32 = x as i32;
                                 let y: i32 = y as i32;
                                 let w: i32 = w as i32;
@@ -391,7 +401,7 @@ impl Camera{
                             },
                         };
                     },
-                _ => (),
+                _ => ({print!("DevDel: object not considered")}),
             }
         }
         pixel_buffer
@@ -399,7 +409,11 @@ impl Camera{
     //camera needs to be updated before this function can be called
     fn point_to_screen_position(&self, point: Point) -> (f64,f64,f64){
         let point_in_parts = self.to_local_coords_vec(point);
-        (point_in_parts.x / point_in_parts.z, point_in_parts.y/point_in_parts.z, point_in_parts.z)
+        print!("\n oints in arts: {:?}",point_in_parts);
+
+        print!("\n:matrix at point b {:?}\n", self.orientation);
+        print!("\n base change vectors at point b: {:?}\n", self.basis_change_matrix);
+        (point_in_parts.x, point_in_parts.y, point_in_parts.z)
     }
     pub fn rotate_degrees_x(&mut self, to_rotate_by: f64){
         let in_radians: f64 = to_rotate_by * (std::f64::consts::PI/180.0);
@@ -425,6 +439,7 @@ impl Camera{
                 -sin, 0.0, cos,
                 )
             );
+        print!("\n:new matrix {:?}\n", self.orientation);
     }
     pub fn rotate_degrees_z(&mut self, to_rotate_by: f64){
         let in_radians: f64 = to_rotate_by * (std::f64::consts::PI/180.0);
@@ -439,7 +454,6 @@ impl Camera{
                 )
             );
     }
-
 }
 //These are definitely subject to change as they will need to update the callibration matrix and/or
 //the camera extrinsics 
