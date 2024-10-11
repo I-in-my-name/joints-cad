@@ -26,6 +26,7 @@ use winit::event::DeviceEvent::*;
 use winit::event::WindowEvent::*;
 use winit::window::{WindowId,Window};
 use winit::application::ApplicationHandler;
+use winit::keyboard::Key::Named;
 
 
 
@@ -50,7 +51,7 @@ impl WorldSpace{
     }
     fn setup(&mut self) {
         let mut camera = Camera::new();
-        camera.update_extrinsics_centre(Point::new(0.0,0.0,0.0,1.0));
+        camera.update_extrinsics_centre(Point::new(10.0,10.0,0.0,1.0));
         //camera.rotate(na::Matrix3::new(0.707107, 0.0, 0.707107,
         //    0.0, 1.0, 0.0,
         //    -0.707107, 0.0, 0.707107));
@@ -60,10 +61,12 @@ impl WorldSpace{
         //  1.0, 0.0, 0.0)); 
         //camera.rotate_degrees_y(90.0);
         self.register_object(coordinate_object::Camera_object(camera));
-        //worldspace.register_object(coordinate_object::Point_object(Point::new(-20.0,0.0,0.5,1.0)));
-        self.register_object(coordinate_object::Point_object(Point::new(-100.0,40.0,200.0,1.0)));
-        //self.register_object(coordinate_object::Point_object(Point::new(-10.0,0.0,0.0,1.0)));
-        self.register_object(coordinate_object::Point_object(Point::new(0.0,-0.7071072,0.707107,1.0)));
+        self.register_object(coordinate_object::Point_object(Point::new(-20.0,0.0,0.5,1.0)));
+        self.register_object(coordinate_object::Point_object(Point::new(1.0,0.0,0.0,1.0)));
+        self.register_object(coordinate_object::Point_object(Point::new(-100.0,40.0,20.0,1.0)));
+        self.register_object(coordinate_object::Point_object(Point::new(-10.0,40.0,20.0,1.0)));
+        self.register_object(coordinate_object::Point_object(Point::new(-10.0,4.0,20.0,1.0)));
+        self.register_object(coordinate_object::Point_object(Point::new(-10.0,0.0,0.0,1.0)));
         let mut visible_objects: Vec<&coordinate_object>;
         self.update_cameras();
     }
@@ -155,7 +158,6 @@ struct Subhandler{
     pixels: Pixels,
     window: Window,
     worldspace: WorldSpace,
-
     right_mouse_button: bool,
 }
 impl Subhandler{
@@ -164,6 +166,7 @@ impl Subhandler{
             pixels: pixels,
             window: window,
             worldspace: WorldSpace::new(),
+            right_mouse_button: true,
         }
     }
     pub fn redraw(&self){
@@ -206,13 +209,13 @@ impl ApplicationHandler for Subhandler{
                 self.redraw();
             },
             WindowEvent::MouseInput{
-                device_id: DeviceId,
-                state: ElementState,
-                button: MouseButton,} => {
-                    match button {
-                        Right => match state{ 
-                            Pressed => self.right_mouse_button = true, 
-                            Released => self.right_mouse_button = false,
+                device_id: device_id,
+                state: state,
+                button: button,} => {
+                    match button {                        
+                        winit::event::MouseButton::Right => match state{ 
+                            winit::event::ElementState::Pressed => self.right_mouse_button = true, 
+                            winit::event::ElementState::Released => self.right_mouse_button = false,
                             },
                         _ => {},
                     };
@@ -224,6 +227,24 @@ impl ApplicationHandler for Subhandler{
             } => {
                 print!("{:?}",delta);
             },
+            WindowEvent::KeyboardInput{
+                device_id: device_id,
+                event: KeyEvent{
+                    logical_key: Named(key_involved),
+                    state: state,
+                    repeat: repeat,
+                    ..},
+                    ..
+            } => {
+                  match (key_involved, state){
+                        ( winit::keyboard::NamedKey::ArrowUp,  winit::event::ElementState::Pressed) => {
+                            self.worldspace.cameras[0].move_forward();
+                            self.worldspace.cameras[0].update_camera();
+                            self.window.request_redraw();
+                        },
+                        (_,_) => {},
+                  };
+                },
             _ =>{},
         }
     

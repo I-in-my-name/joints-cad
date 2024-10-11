@@ -1,6 +1,8 @@
 extern crate nalgebra as na;
 use std::cmp::Ordering;
 use std::ops::Add;
+use std::{thread, env};
+use std::time::{Duration};
 
 #[derive(Clone,Debug)]
 pub enum coordinate_object{
@@ -231,11 +233,11 @@ impl Camera{
             extrinsics_inverse: na::Matrix4::<f64>::zeros(),
             camera_matrix_superior: na::Matrix4::<f64>::zeros(),
             basis_change_matrix: na::Matrix3::<f64>::zeros(),
-            fov_y: 90.0,
-            fov_x: 90.0,
+            fov_y: 70.0,
+            fov_x: 70.0,
             screen_x: 128,
             screen_y:128,
-            min_depth_difference: 2.0,
+            min_depth_difference: 0.5,
             max_depth_difference: 1200.0,
         };
         new_camera.update_extrinsics_centre(Point::new(0.0,0.0,1.0,1.0));
@@ -283,11 +285,12 @@ impl Camera{
     }
     //Very much subject to change, this is tracer code and needs to be fine tuned
     pub fn update_intrinsics(&mut self){
+        let focal_length = self.screen_x as f64 / (2.0 * (self.fov_x /2.0).tan());
         self.calibration_matrix = na::Matrix4::new(
-                1.0, 0.0, self.centre.point.x, 0.0,
-                0.0, 1.0, self.centre.point.y, 0.0,
-                0.0, 0.0, 1.0,                 0.0,
-                0.0, 0.0, 0.0,                 1.0
+                focal_length, 0.0,                    self.screen_x as f64 /2.0 , 0.0,
+                0.0,                     focal_length, self.screen_x as f64 / 2.0, 0.0,
+                0.0,                     0.0,                      1.0,                      0.0, 
+                0.0,                     0.0,                      0.0,                      1.0
             );
     }
     pub fn update_screen_size(&mut self, width: i32, height: i32){
@@ -296,7 +299,10 @@ impl Camera{
     }
     //if 3x4 is fine then refactor necessary, check after tracer code is working 
     pub fn update_superior_matrix(&mut self){
+        //I recommend looking at the wikipedia page for orthographic projection when understanding
+        //this matrix;
         self.camera_matrix_superior = self.calibration_matrix * self.camera_extrinsics;
+ 
     }
     pub fn to_local_coords_vec(&self, point: Point) -> na::Vector3<f64>{               
             //apply change of basis to get truly camera oriented coords
@@ -326,8 +332,12 @@ impl Camera{
 
     }
     pub fn update_camera(&mut self){
+        self.fov_x = self.screen_x as f64 * (self.screen_x as f64 /2.0).atan();
         self.update_extrinsics(self.centre, self.orientation);
         self.update_basis_change_matrix();
+        self.update_intrinsics();
+        self.update_superior_matrix();
+
 
     }
     //output from this functiom is not mutable for borrowing and logical, purposes
@@ -373,28 +383,47 @@ impl Camera{
                 coordinate_object::Point_object(point) => {
                         match self.point_to_screen_position(*point){
                             (x,y,w) => {
-                                print!("{:?} {:?} {:?}",x,y,w);
-                                let x: i32 = x as i32;
-                                let y: i32 = y as i32;
-                                let w: i32 = w as i32;
-                                let mut factor: f64 = ((self.screen_y - w) as f64 ) * 0.25;
-                                if factor < 0.0 {
-                                    factor = 1.0;
-                                }
-                                let factor = factor as i32;
-                                let camera_centre_x = self.centre.point_to_vector().x as i32; 
-                                let camera_centre_y = self.centre.point_to_vector().y as i32;
+                                print!("VALUES:{:?} {:?} {:?}",x,y,w);
+                                //agreed size of a point
+                                let point_size = 500.0;
+                                //screen fov based approach:
+                                //print!("\nFOV:{:?}\n", self.fov_x);
+                                //print!("matrix: {:?}\n",self.camera_matrix_superior * point.point_to_vector());
+                                let vec4 = (self.calibration_matrix * self.camera_extrinsics) *  point.point_to_vector();
+                                let vec4_fixed = na::Vector4::new(
+                                    vec4.x/vec4.z,
+                                    vec4.y/vec4.z,
+                                    vec4.z/vec4.z,
+                                    vec4.w/vec4.z,
+                                    );
+                                //print!("W:{:?}\n",vec4.w);
+                                print!("Good!:{:?}\n",vec4_fixed);
+                                //
+                                //print!("other matrix2 {:?}\n",self.calibration_matrix );
+                                //print!("screen {:?}\n",self.screen_x);
 
-                                let lower_x = x - factor/2;
-                                let lower_y = y - factor/2;
+                                //latter screen_x should be whichever one is larger
+
+                                //thread::sleep(Duration::new(2,10));
+                                let new_x = vec4_fixed.x;
+                                let new_y = vec4_fixed.y;
+
+                                let distance = (x.powf(2.0) + y.powf(2.0) + w.powf(2.0)).sqrt();
+                                let visual_size = point_size / (2.0 * distance); 
+                                let lower_x = (new_x - visual_size / 2.0) as i32; 
+                                let lower_y = (new_y - visual_size / 2.0) as i32;
+                                //look at paper!!
+
                                 //cycles through each pixel in a range around the point 
-                                for x_i in lower_x .. (x + factor/2){
-                                    for y_i in lower_y .. (y + factor/2){
+                                for x_i in lower_x .. (new_x + visual_size / 2.0) as i32{
+                                    for y_i in lower_y .. (new_y + visual_size / 2.0) as i32{
                                         //because of the slice representation, we need to calulate
                                         //the pixel value like this
-                                        if (-self.screen_y/2 <= y_i && y_i <= self.screen_y/2 &&
-                                            -self.screen_x/2 <= x_i && x_i <= self.screen_x/2 ){
-                                            pixel_buffer[((y_i +  self.screen_y/2) * self.screen_x + (x_i + self.screen_x/2)) as usize] = [0x5e, 0x48, 0xe8, 0xff];
+                                        //print!("VALUES x_i, y_i :{:?} {:?}",x_i,y_i);
+                                        if (0<= y_i && y_i < self.screen_y &&
+                                            0<= x_i && x_i < self.screen_x ){
+                                            pixel_buffer[((y_i) * self.screen_x + (x_i)) as usize] = [0x5e, 0x48, 0xe8, 0xff];
+
                                         }
                                     }
                                 }
@@ -404,15 +433,13 @@ impl Camera{
                 _ => ({print!("DevDel: object not considered")}),
             }
         }
+        pixel_buffer[0] =  [0x5e, 0x48, 0xe8, 0xff];
         pixel_buffer
     }
     //camera needs to be updated before this function can be called
     fn point_to_screen_position(&self, point: Point) -> (f64,f64,f64){
         let point_in_parts = self.to_local_coords_vec(point);
         print!("\n oints in arts: {:?}",point_in_parts);
-
-        print!("\n:matrix at point b {:?}\n", self.orientation);
-        print!("\n base change vectors at point b: {:?}\n", self.basis_change_matrix);
         (point_in_parts.x, point_in_parts.y, point_in_parts.z)
     }
     pub fn rotate_degrees_x(&mut self, to_rotate_by: f64){
@@ -453,6 +480,23 @@ impl Camera{
                 0.0, 0.0, 1.0,
                 )
             );
+    }
+    //MOVEMENT SECTION
+    //
+    pub fn move_forward(&mut self){
+        let unit_vector_x = self.orientation * Point::new(1.0,0.0,0.0,1.0).point_ignore_w(); 
+        let unit_vector_y = self.orientation * Point::new(0.0,1.0,0.0,1.0).point_ignore_w();
+        let unit_vector_z = self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w(); 
+
+        let movement_factor = 0.5;
+        let to_add = na::Vector4::new(
+                 unit_vector_z.x,
+                 unit_vector_z.y,
+                 unit_vector_z.z,
+                 0.0
+                 );
+        self.centre = Point::vector_to_point(self.centre.point + to_add* movement_factor);
+        self.update_camera();
     }
 }
 //These are definitely subject to change as they will need to update the callibration matrix and/or
