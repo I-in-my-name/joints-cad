@@ -237,7 +237,7 @@ impl Camera{
             fov_x: 70.0,
             screen_x: 128,
             screen_y:128,
-            min_depth_difference: 0.5,
+            min_depth_difference: 1.0,
             max_depth_difference: 1200.0,
         };
         new_camera.update_extrinsics_centre(Point::new(0.0,0.0,1.0,1.0));
@@ -389,6 +389,11 @@ impl Camera{
                                 //screen fov based approach:
                                 //print!("\nFOV:{:?}\n", self.fov_x);
                                 //print!("matrix: {:?}\n",self.camera_matrix_superior * point.point_to_vector());
+                                //
+                                //ISSUE HERE!! INCORRECT EVERYTHING FOR DISPLAY, TRY JUST LOCAL
+                                //COORDS TO SCREEN. the issue here is that the midpoint isnt
+                                //actually considered at all when multiplying by a small number for
+                                //z
                                 let vec4 = (self.calibration_matrix * self.camera_extrinsics) *  point.point_to_vector();
                                 let vec4_fixed = na::Vector4::new(
                                     vec4.x/vec4.z,
@@ -498,6 +503,82 @@ impl Camera{
         self.centre = Point::vector_to_point(self.centre.point + to_add* movement_factor);
         self.update_camera();
     }
+    pub fn move_back(&mut self){
+        let unit_vector_x = self.orientation * Point::new(1.0,0.0,0.0,1.0).point_ignore_w(); 
+        let unit_vector_y = self.orientation * Point::new(0.0,1.0,0.0,1.0).point_ignore_w();
+        let unit_vector_z = self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w(); 
+
+        let movement_factor = 0.5;
+        let to_add = na::Vector4::new(
+                 -unit_vector_z.x,
+                 -unit_vector_z.y,
+                 -unit_vector_z.z,
+                 0.0
+                 );
+        self.centre = Point::vector_to_point(self.centre.point + to_add* movement_factor);
+        self.update_camera();
+    }
+    pub fn move_down(&mut self){
+        let unit_vector_x = self.orientation * Point::new(1.0,0.0,0.0,1.0).point_ignore_w(); 
+        let unit_vector_y = self.orientation * Point::new(0.0,1.0,0.0,1.0).point_ignore_w();
+        let unit_vector_z = self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w(); 
+
+        let movement_factor = 0.5;
+        let to_add = na::Vector4::new(
+                 unit_vector_y.x,
+                 unit_vector_y.y,
+                 unit_vector_y.z,
+                 0.0
+                 );
+        self.centre = Point::vector_to_point(self.centre.point + to_add* movement_factor);
+        self.update_camera();
+    }
+    pub fn move_up(&mut self){
+        let unit_vector_x = self.orientation * Point::new(1.0,0.0,0.0,1.0).point_ignore_w(); 
+        let unit_vector_y = self.orientation * Point::new(0.0,1.0,0.0,1.0).point_ignore_w();
+        let unit_vector_z = self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w(); 
+
+        let movement_factor = 0.5;
+        let to_add = na::Vector4::new(
+                 -unit_vector_y.x,
+                 -unit_vector_y.y,
+                 -unit_vector_y.z,
+                 0.0
+                 );
+        self.centre = Point::vector_to_point(self.centre.point + to_add* movement_factor);
+        self.update_camera();
+    }   
+    pub fn move_right(&mut self){
+        let unit_vector_x = self.orientation * Point::new(1.0,0.0,0.0,1.0).point_ignore_w(); 
+        let unit_vector_y = self.orientation * Point::new(0.0,1.0,0.0,1.0).point_ignore_w();
+        let unit_vector_z = self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w(); 
+
+        let movement_factor = 0.5;
+        let to_add = na::Vector4::new(
+                 unit_vector_x.x,
+                 unit_vector_x.y,
+                 unit_vector_x.z,
+                 0.0
+                 );
+        self.centre = Point::vector_to_point(self.centre.point + to_add* movement_factor);
+        self.update_camera();
+    }
+ pub fn move_left(&mut self){
+        let unit_vector_x = self.orientation * Point::new(1.0,0.0,0.0,1.0).point_ignore_w(); 
+        let unit_vector_y = self.orientation * Point::new(0.0,1.0,0.0,1.0).point_ignore_w();
+        let unit_vector_z = self.orientation * Point::new(0.0,0.0,1.0,1.0).point_ignore_w(); 
+
+        let movement_factor = 0.5;
+        let to_add = na::Vector4::new(
+                 -unit_vector_x.x,
+                 -unit_vector_x.y,
+                 -unit_vector_x.z,
+                 0.0
+                 );
+        self.centre = Point::vector_to_point(self.centre.point + to_add* movement_factor);
+        self.update_camera();
+    }
+
 }
 //These are definitely subject to change as they will need to update the callibration matrix and/or
 //the camera extrinsics 

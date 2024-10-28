@@ -51,7 +51,7 @@ impl WorldSpace{
     }
     fn setup(&mut self) {
         let mut camera = Camera::new();
-        camera.update_extrinsics_centre(Point::new(10.0,10.0,0.0,1.0));
+        camera.update_extrinsics_centre(Point::new(0.0,0.0,0.0,1.0));
         //camera.rotate(na::Matrix3::new(0.707107, 0.0, 0.707107,
         //    0.0, 1.0, 0.0,
         //    -0.707107, 0.0, 0.707107));
@@ -61,12 +61,7 @@ impl WorldSpace{
         //  1.0, 0.0, 0.0)); 
         //camera.rotate_degrees_y(90.0);
         self.register_object(coordinate_object::Camera_object(camera));
-        self.register_object(coordinate_object::Point_object(Point::new(-20.0,0.0,0.5,1.0)));
-        self.register_object(coordinate_object::Point_object(Point::new(1.0,0.0,0.0,1.0)));
-        self.register_object(coordinate_object::Point_object(Point::new(-100.0,40.0,20.0,1.0)));
-        self.register_object(coordinate_object::Point_object(Point::new(-10.0,40.0,20.0,1.0)));
-        self.register_object(coordinate_object::Point_object(Point::new(-10.0,4.0,20.0,1.0)));
-        self.register_object(coordinate_object::Point_object(Point::new(-10.0,0.0,0.0,1.0)));
+        self.register_object(coordinate_object::Point_object(Point::new(0.0,0.0,5.0,1.0)));
         let mut visible_objects: Vec<&coordinate_object>;
         self.update_cameras();
     }
@@ -123,7 +118,7 @@ impl PixelsApplication{
     pub fn new() -> Result<Self, Error>{
         env_logger::init();
         let mut event_loop = EventLoop::new().unwrap();
-        let default_size = LogicalSize::new(128.0,128.0);
+        let default_size = LogicalSize::new(256.0,256.0);
         let mut window_grabbed = event_loop.create_window(Window::default_attributes().with_title("Grand CAD Environment").with_decorations(true).with_visible(true)); 
         let mut window = match window_grabbed {
             Ok(window) => window,
@@ -242,6 +237,33 @@ impl ApplicationHandler for Subhandler{
                             self.worldspace.cameras[0].update_camera();
                             self.window.request_redraw();
                         },
+                        ( winit::keyboard::NamedKey::ArrowDown,  winit::event::ElementState::Pressed) => {
+                            self.worldspace.cameras[0].move_back();
+                            self.worldspace.cameras[0].update_camera();
+                            self.window.request_redraw();
+                        },
+                        ( winit::keyboard::NamedKey::ArrowLeft,  winit::event::ElementState::Pressed) => {
+                            self.worldspace.cameras[0].move_left();
+                            self.worldspace.cameras[0].update_camera();
+                            self.window.request_redraw();
+                        },
+                        ( winit::keyboard::NamedKey::ArrowRight,  winit::event::ElementState::Pressed) => {
+                            self.worldspace.cameras[0].move_right();
+                            self.worldspace.cameras[0].update_camera();
+                            self.window.request_redraw();
+                        },
+                        ( winit::keyboard::NamedKey::Space,  winit::event::ElementState::Pressed) => {
+                            self.worldspace.cameras[0].move_up();
+                            self.worldspace.cameras[0].update_camera();
+                            self.window.request_redraw();
+                        },
+                        ( winit::keyboard::NamedKey::Shift,  winit::event::ElementState::Pressed) => {
+                            self.worldspace.cameras[0].move_down();
+                            self.worldspace.cameras[0].update_camera();
+                            self.window.request_redraw();
+                        },
+
+
                         (_,_) => {},
                   };
                 },
